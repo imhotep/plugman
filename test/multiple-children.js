@@ -41,12 +41,12 @@ exports['should install okay'] = function (test) {
 
 exports['should install all the uses-permission tags'] = function (test) {
     android.handlePlugin('install', test_project_dir, test_plugin_dir, plugin_et);
-    var manifestPath = path.join(test_dir, 'projects', 'multiple-children', 'AndroidManifest.xml');
+    var manifestPath = path.join(test_dir, 'projects', 'multiple-children', 'platforms', 'android', 'AndroidManifest.xml');
     var manifestTxt = fs.readFileSync(manifestPath, 'utf8'),
         mDoc = new et.ElementTree(et.XML(manifestTxt)),
         found, receive;
 
-    found = mDoc.findall(usesPermission('READ_PHONE_STATE'))
+    found = mDoc.findall(usesPermission('READ_PHONE_STATE'));
     test.equal(found.length, 1, 'READ_PHONE_STATE permission');
 
     found = mDoc.findall(usesPermission('INTERNET'))
@@ -68,7 +68,7 @@ exports['should install all the uses-permission tags'] = function (test) {
 
 exports['should interpolate the $PACKAGE_NAME correctly'] = function (test) {
     android.handlePlugin('install', test_project_dir, test_plugin_dir, plugin_et);
-    var manifestPath = path.join(test_dir, 'projects', 'multiple-children', 'AndroidManifest.xml');
+    var manifestPath = path.join(test_dir, 'projects', 'multiple-children', 'platforms', 'android', 'AndroidManifest.xml');
     var manifestTxt = fs.readFileSync(manifestPath, 'utf8'),
         mDoc = new et.ElementTree(et.XML(manifestTxt)),
         soughtEle;

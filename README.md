@@ -5,12 +5,31 @@ A command line tool to distribute and package plugins for use with Apache Cordov
 
 This document defines tool usage and the plugin format specification. This is not an official document of the Apache Cordova project.
 
+## Origins
 
+This code stands on the shoulder of giants; it is a fork of Andrew Lunny's awesome pluginstall tool, which he developed to drive the PhoneGap Build (https://build.phonegap.com) web service. 
+`we introduced these deltas:`
+
+* provide plugin namespacing
+* simplification of the plugin.xml format
+* simplify flow control, moving to synchronous everywhere
+* uses xcode module from @imhotep
+* uses elementtree convenience functions from @imhotep
+* uses node-plist
+* modifies the command line format in preparation for future pluginstall features
+* support binary plists in ios projects
+* uses shelljs to consolidate many of the shell activities
+* consolidated XML handling into util/xml-helpers.js
+* consolidated common platform handling into util/platform-helpers.js
+* refactored tests to use platform agnostic temp dir and cleaner setup/teardown
+* friendly error handling rather than dumping a stack trace on failure
+* writing xml files preserves indenting rather than mangling newlines
+* 
 ## Design Goals
 * facilitate programmatic installation and manipulation of plugins
 * detail the dependencies and components of individual plugins
 * allow code reuse between different target platforms
-
+* namespace plugins assets to prevent collisions
 
 ## Usage
 
@@ -33,10 +52,12 @@ Example:
 ### Supported Platforms
 * iOS
 * Android
+* www
 
 ### Supported Plugins
 Andrew Lunny's tamed plugins for ChildBrowser and PGSQLite will work but need to be massaged into the right format. 
 
+**TODO**: link to a tool that can get compatible packages
 
 ## Development
 
@@ -57,9 +78,12 @@ Here is a sample plugin named foo with android and ios platforms support, and 2 
 ```
 foo-plugin/
 |- plugin.xml     # xml-based manifest
-|- src/           # native source for each platform
+|- native/        # nativate source for each platform
 |  |- android/ 
-|  |  `- Foo.java
+|  |  `- com/
+|  |     `- phonegap/
+|  |        `- foo-plugin/
+|  |           `- Foo.java
 |  `- ios/
 |     |- CDVFoo.h
 |     `- CDVFoo.m
@@ -68,6 +92,7 @@ foo-plugin/
    |- foo.js
    `- foo.png 
 ```   
+
 
 ## plugin.xml Manifest Format
 
@@ -208,47 +233,18 @@ are listed:
 * android
 * ios
 
-
-### &lt;source-file&gt;
-
-`source-file` elements identify executable source code that should be installed
-into a project. A couple of examples:
-
-    <!-- android -->
-    <source-file src="src/android/Foo.java"
-                    target-dir="src/com/alunny/foo" />
-    <!-- ios -->
-    <source-file src="CDVFoo.m" />
-
-As with assets, if a `source-file` would overwrite an existing file, tools
-should notify the user and stop, like, right away.
-
-#### src (required)
-
-Where the file is located, relative to the `plugin.xml` file.
-
-#### target-dir
-
-A directory where the files should be copied into, relative to the root of the
-Cordova project.
-
-In practice, this is most important for Java-based platforms, where a file in
-the package `com.alunny.foo` has be located under the directory
-`com/alunny/foo`. For platforms where the source directory is not important,
-plugin authors should omit this attribute.
-
-### &lt;config-file&gt;
+### &lt;xml-graft&gt;
 
 Identifies an XML-based configuration file to be modified, where in that
 document the modification should take place, and what should be modified.
 
-At this stage in the spec, the `config-file` element only allows for appending
+At this stage in the spec, the `xml-graft` element only allows for appending
 new children into an XML document. The children are XML literals that are the
 to be inserted in the target document.
 
 Example:
 
-    <config-file target="AndroidManifest.xml" parent="/manifest/application">
+    <xml-graft file="AndroidManifest.xml" xpath="/manifest/application">
         <activity android:name="com.foo.Foo"
                   android:label="@string/app_name">
                   <intent-filter>
@@ -256,43 +252,31 @@ Example:
         </activity>
     </config-file>
 
-#### target
+#### file
 
 The file to be modified, and the path relative to the root of the Cordova
 project.
 
-If this file does not exist, the tool will exit.
+If this file does not exist, tools should self-destruct over a period of ten
+minutes. Within the first five minutes, the self-destruct procedure MAY be
+cancelled with the appropriate security clearance. After five minutes have
+passed, the self-destruct procedure MUST complete.
 
-#### parent
+Or they could just stop.
+
+#### xpath
 
 An absolute XPath selector pointing to the parent of the elements to be added to
 the config file.
 
-### &lt;plugins-plist&gt;
+### &lt;plist-add&gt;
 
 Specifies a key and value to append to the correct `AppInfo.plist` file in an
 iOS Cordova project. Example:
 
     <plugins-plist key="Foo"
                    string="CDVFoo" />
-
-This may be an implementation detail leaking through, and could be merged with
-the `config-file` element at some later point.
-
-### &lt;resource-file&gt; and &lt;header-file&gt;
-
-Like source files, but specifically for platforms that distinguish between
-source files, headers, and resources (iOS)
-
-Examples:
-
-    <resource-file src="CDVFoo.bundle" />
-    <resource-file src="CDVFooViewController.xib" />
-    <header-file src="CDVFoo.h" />
-
-This is probably an implementation detail leaking through, and future versions
-of this document will likely merge these elements with `source-file`.
-
+          
 
 ### &lt;framework&gt;
 

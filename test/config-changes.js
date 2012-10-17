@@ -1,10 +1,10 @@
-var configChanges = require('../util/config-changes'),
-    fs = require('fs'),
+var fs = require('fs'),
     et = require('elementtree'),
     xmlText = fs.readFileSync('test/dummy.xml', 'utf-8'),
     xmlDoc = new et.ElementTree(et.XML(xmlText)),
     platformTag = null;
-
+// TODO: config-changes is gone, but these tests may be valuable in another context (parsing elemeenttree for example)
+/*
 exports.android = {
     setUp: function (callback) {
         platformTag = xmlDoc.find('./platform[@name="android"]');
@@ -36,3 +36,4 @@ exports.android = {
         test.done();
     }
 }
+*/

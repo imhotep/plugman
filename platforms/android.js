@@ -1,138 +1,81 @@
-var fs = require('fs')  // use existsSync in 0.6.x
-   , path = require('path')
-   , shell = require('shelljs')
-   , et = require('elementtree')
-   , getConfigChanges = require('../util/config-changes')
+var path = require('path')
+  , fs = require(path.join('..', 'util', 'fs'))  // use existsSync in 0.6.x
+  , glob = require('glob')
+  , et = require('elementtree')
+  , shell = require('shelljs')
+  , xml_helpers = require(path.join(__dirname, '..', 'util', 'xml-helpers'))
+  , platform_helpers = require(path.join(__dirname, '..', 'util', 'platform-helpers'))
+  , assetsDir = 'assets/www'  // relative path to project's web assets
+  , sourceDir = 'src';
 
-   , assetsDir = 'assets/www'  // relative path to project's web assets
-   , sourceDir = 'src'
-   , xml_helpers = require(path.join(__dirname, '..', 'util', 'xml-helpers'));
-
-
+/**
+ * install or uninstall a plugin for an android project
+ *
+ * @param enumeration action     install | uninstall
+ * @param path project_dir root directory in the android project
+ * @param path plugin_dir root directory in the plugin to install
+ * @param elementtree plugin_et plugin configuration object 
+ */
 exports.handlePlugin = function (action, project_dir, plugin_dir, plugin_et) {
     var plugin_id = plugin_et._root.attrib['id']
-      , version = plugin_et._root.attrib['version']
-      , external_hosts = []
       , i = 0
       // look for assets in the plugin 
       , assets = plugin_et.findall('./asset')
       , platformTag = plugin_et.find('./platform[@name="android"]')
-      , sourceFiles = platformTag.findall('./source-file')
       , libFiles = platformTag.findall('./library-file')
-      , PACKAGE_NAME = androidPackageName(project_dir)
-      , configChanges = getConfigChanges(platformTag);
+      , xmlGrafts = platformTag.findall('./xml-graft')
+      , project_www_dir = path.join(project_dir, 'www', plugin_id)
+      , dest_plugin_dir = path.join(project_dir, 'platforms', 'android', 'src');
 
-    // find which config-files we're interested in
-    Object.keys(configChanges).forEach(function (configFile) {
-        if (!fs.existsSync(path.resolve(project_dir, configFile))) {
-            delete configChanges[configFile];
+    // fail if the package is already installed
+    if (action === 'install' && platform_helpers.pluginInstalled(project_dir, plugin_id)) {
+        throw new Error('plugin ' + plugin_id + ' is already installed');
+    }
+
+    // TODO: hoist error checking to fail before making changes needing undo
+
+    xmlGrafts.forEach(function (tag) {
+        var xpath_selector = tag.attrib['xpath']
+          , file = tag.attrib['file']
+          , full_path = path.join(project_dir, 'platforms', 'android', file)
+          , children = tag.findall('*')
+          , xml_doc = null;
+
+        // verify file exists
+        if(fs.existsSync(full_path))
+        {
+            // load into xml, then graft that motherfucker and save it!
+            xml_doc = xml_helpers.parseElementtreeSync(full_path);
+            if (action === 'install') {
+                // the install action grafts a new node onto the XML tree
+                xml_helpers.graftXML(xml_doc, children, xpath_selector);
+            } else {
+                // reverse the install action (prune the node from the XML tree)
+                xml_helpers.pruneXML(xml_doc, children, xpath_selector);
+            }
+            // save the modified XMl back to storage
+            output = xml_doc.write({indent: 4});
+            output = output.replace(/\$PACKAGE_NAME/g, plugin_id);
+            fs.writeFileSync(full_path, output, 'utf8');
         }
     });
 
-    // move asset files
-    assets.forEach(function (asset) {
-        var srcPath = path.resolve(
-                        plugin_dir,
-                        asset.attrib['src']);
+    // TODO: which plugins have a library-file tag? I haven't seen any
 
-        var targetPath = path.resolve(
-                            project_dir,
-                            assetsDir,
-                            asset.attrib['target']);
-
-        var stats = fs.statSync(srcPath);
-        if (action == 'install') {
-            shell.mkdir('-p', targetPath);
-            if(stats.isDirectory()) {
-                //console.log('copying', srcPath, path.join(project_dir, assetsDir));
-                shell.cp('-R', srcPath, path.join(project_dir, assetsDir));
-            } else {
-                shell.cp(srcPath, targetPath);
-            }
-        } else {
-            if(stats.isDirectory()) {
-                shell.rm('-rf', targetPath);
-            } else {
-                shell.rm('-rf', targetPath);
-            }
+    if (action === 'install') {
+        // copy all of the native and www assets from the plugin into the project
+        platform_helpers.copyFiles('android', plugin_dir, project_www_dir, dest_plugin_dir);
+    } else {
+        // use package name to determine path to the native android resources
+        // example: com.alunny.foo would resolve to platforms/android/src/com/alunny/foo/
+        var pieces = plugin_id.split('.');
+        var to_remove = dest_plugin_dir;
+        for(var j=0;j < pieces.length;j++) {
+            to_remove = path.join(to_remove, pieces[j]);
         }
-    });
-
-    // move source files
-    sourceFiles.forEach(function (sourceFile) {
-        var srcDir = path.resolve(project_dir,
-                                sourceFile.attrib['target-dir'])
-          , destFile = path.resolve(srcDir,
-                                path.basename(sourceFile.attrib['src']));
-
-        if (action == 'install') {
-            shell.mkdir('-p', srcDir);
-            var srcFile = srcPath(plugin_dir, sourceFile.attrib['src']);
-            shell.cp(srcFile, destFile);
-        } else {
-            fs.unlinkSync(destFile);
-            // check if directory is empty
-            var files = fs.readdirSync(srcDir);
-            if(files.length == 0) {
-                shell.rm('-rf', srcDir);
-            }
-        }
-    })
-
-    // move library files
-    libFiles.forEach(function (libFile) {
-        var libDir = path.resolve(project_dir,
-                                libFile.attrib['target-dir'])
-
-        if (action == 'install') {
-            shell.mkdir('-p', libDir);
-            var src = path.resolve(plugin_dir, 'src/android',
-                                        libFile.attrib['src']),
-                dest = path.resolve(libDir,
-                                path.basename(libFile.attrib['src']));
-            
-            shell.cp(src, dest);
-        } else {
-            var destFile = path.resolve(libDir,
-                            path.basename(libFile.attrib['src']));
-
-            fs.unlinkSync(destFile);
-            // check if directory is empty
-            var files = fs.readdirSync(libDir);
-            if(files.length == 0) {
-                shell.rm('-rf', libDir);
-            }
-        }
-    })
-
-
-    // edit configuration files
-    Object.keys(configChanges).forEach(function (filename) {
-        var filepath = path.resolve(project_dir, filename),
-            xmlDoc = xml_helpers.parseElementtreeSync(filepath),
-            output;
-
-        configChanges[filename].forEach(function (configNode) {
-            var selector = configNode.attrib["parent"],
-                children = configNode.findall('*');
-
-            if( action == 'install') {
-                if (!xml_helpers.graftXML(xmlDoc, children, selector)) {
-                    throw new Error('failed to add children to ' + filename);
-                }
-            } else {
-                if (!xml_helpers.pruneXML(xmlDoc, children, selector)) {
-                    throw new Error('failed to remove children from' + filename);
-                }
-            }
-        });
-
-        output = xmlDoc.write({indent: 4});
-        output = output.replace(/\$PACKAGE_NAME/g, PACKAGE_NAME);
-        fs.writeFileSync(filepath, output);
-    });
+        platform_helpers.removeFiles(project_www_dir, to_remove);
+    }
 }
-
 
 function srcPath(pluginPath, filename) {
     var prefix = /^src\/android/;
@@ -148,8 +91,9 @@ function srcPath(pluginPath, filename) {
 // @param string project_dir the absolute path to the directory containing the project
 // @return string the name of the package
 function androidPackageName(project_dir) {
-    var mDoc = xml_helpers.parseElementtreeSync(
-            path.resolve(project_dir, 'AndroidManifest.xml'));
-
-    return mDoc._root.attrib['package'];
+  if (!fs.existsSync(path.resolve(project_dir, 'platforms', 'android', 'AndroidManifest.xml'))) {
+    throw new Error(project_dir + " isn't a project directory. AndroidManifest.xml not found.");
+  }
+  var mDoc = xml_helpers.parseElementtreeSync(path.resolve(project_dir, 'platforms', 'android', 'AndroidManifest.xml'));
+  return mDoc._root.attrib['package'];
 }

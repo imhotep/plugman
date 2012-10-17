@@ -10,12 +10,10 @@ var fs = require('fs')
   , android = require(path.join(__dirname, '..', 'platforms', 'android'))
 
   , test_dir = path.join(osenv.tmpdir(), 'test_pluginstall')
-  , test_project_dir = path.join(test_dir, 'projects', 'android_two')
+  , test_project_dir = path.join(test_dir, 'projects', 'testproj')
   , test_plugin_dir = path.join(test_dir, 'plugins', 'ChildBrowser')
   , xml_path     = path.join(test_dir, 'plugins', 'ChildBrowser', 'plugin.xml')
-  , xml_text, plugin_et;
-
-
+  , xml_text, plugin_et, plugin_id;
 
 exports.setUp = function(callback) {
     shell.mkdir('-p', test_dir);
@@ -29,6 +27,7 @@ exports.setUp = function(callback) {
     // parse the plugin.xml into an elementtree object
     xml_text   = fs.readFileSync(xml_path, 'utf-8')
     plugin_et  = new et.ElementTree(et.XML(xml_text));
+    plugin_id  = plugin_et._root.attrib['id'];
 
     callback();
 }
@@ -41,9 +40,10 @@ exports.tearDown = function(callback) {
 
 
 exports['should move the js file'] = function (test) {
-    var jsPath = path.join(test_dir, 'projects', 'android_two', 'assets', 'www', 'childbrowser.js');
-
+    
     android.handlePlugin('install', test_project_dir, test_plugin_dir, plugin_et);
+
+    var jsPath = path.join(test_dir, 'projects', 'testproj', 'www', plugin_id, 'childbrowser.js');
     test.ok(fs.existsSync(jsPath));
     test.done();
 }
@@ -51,19 +51,19 @@ exports['should move the js file'] = function (test) {
 exports['should move the directory'] = function (test) {
     android.handlePlugin('install', test_project_dir, test_plugin_dir, plugin_et);
 
-    var assetPath = path.join(test_dir, 'projects', 'android_two', 'assets', 'www', 'childbrowser');
-
+    var assetPath = path.join(test_dir, 'projects', 'testproj', 'www', plugin_id);
+    
     var assets = fs.statSync(assetPath);
 
     test.ok(assets.isDirectory());
-    test.ok(fs.statSync(assetPath + '/image.jpg'))
+    test.ok(fs.statSync(path.join(assetPath, 'icon_close.png')));
     test.done();
 }
 
 exports['should move the src file'] = function (test) {
     android.handlePlugin('install', test_project_dir, test_plugin_dir, plugin_et);
 
-    var javaPath = path.join(test_dir, 'projects', 'android_two', 'src', 'com', 'phonegap', 'plugins', 'childBrowser', 'ChildBrowser.java');
+    var javaPath = path.join(test_dir, 'projects', 'testproj', 'platforms', 'android', 'src', 'com', 'phonegap', 'plugins', 'childBrowser', 'ChildBrowser.java');
     test.ok(fs.statSync(javaPath));
     test.done();
 }
@@ -71,7 +71,7 @@ exports['should move the src file'] = function (test) {
 exports['should add ChildBrowser to config.xml'] = function (test) {
     android.handlePlugin('install', test_project_dir, test_plugin_dir, plugin_et);
 
-    var pluginsXmlPath = path.join(test_dir, 'projects', 'android_two', 'res', 'xml', 'config.xml');
+    var pluginsXmlPath = path.join(test_dir, 'projects', 'testproj', 'platforms', 'android', 'res', 'xml', 'config.xml');
     var pluginsTxt = fs.readFileSync(pluginsXmlPath, 'utf-8'),
         pluginsDoc = new et.ElementTree(et.XML(pluginsTxt)),
         expected = 'plugins/plugin[@name="ChildBrowser"]' +
@@ -84,7 +84,7 @@ exports['should add ChildBrowser to config.xml'] = function (test) {
 exports['should add ChildBrowser to AndroidManifest.xml'] = function (test) {
     android.handlePlugin('install', test_project_dir, test_plugin_dir, plugin_et);
 
-    var manifestPath = path.join(test_dir, 'projects', 'android_two', 'AndroidManifest.xml');
+    var manifestPath = path.join(test_dir, 'projects', 'testproj', 'platforms', 'android', 'AndroidManifest.xml');
     var manifestTxt = fs.readFileSync(manifestPath, 'utf-8'),
         manifestDoc = new et.ElementTree(et.XML(manifestTxt)),
         activities = manifestDoc.findall('application/activity'), i;

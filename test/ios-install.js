@@ -8,10 +8,10 @@ var fs = require('fs')
   , ios = require(path.join(__dirname, '..', 'platforms', 'ios'))
 
   , test_dir = path.join(osenv.tmpdir(), 'test_pluginstall')
-  , test_project_dir = path.join(test_dir, 'projects', 'ios')
+  , test_project_dir = path.join(test_dir, 'projects', 'testproj')
   , test_plugin_dir = path.join(test_dir, 'plugins', 'ChildBrowser')
   , xml_path     = path.join(test_dir, 'plugins', 'ChildBrowser', 'plugin.xml')
-  , xml_text, plugin_et
+  , xml_text, plugin_et, plugin_id
 
   //, assetsDir = path.resolve(config.projectPath, 'www')
   , srcDir = path.resolve(test_project_dir, 'SampleApp/Plugins')
@@ -29,6 +29,7 @@ exports.setUp = function(callback) {
     // parse the plugin.xml into an elementtree object
     xml_text   = fs.readFileSync(xml_path, 'utf-8')
     plugin_et  = new et.ElementTree(et.XML(xml_text));
+    plugin_id  = plugin_et._root.attrib['id'];
 
     callback();
 }
@@ -43,7 +44,7 @@ exports['should move the js file'] = function (test) {
     // run the platform-specific function
     ios.handlePlugin('install', test_project_dir, test_plugin_dir, plugin_et);
 
-    var jsPath = path.join(test_dir, 'projects', 'ios', 'www', 'childbrowser.js');
+    var jsPath = path.join(test_dir, 'projects', 'testproj', 'www', plugin_id, 'childbrowser.js');
     test.ok(fs.existsSync(jsPath));
     test.done();
 }
@@ -52,10 +53,10 @@ exports['should move the source files'] = function (test) {
     // run the platform-specific function
     ios.handlePlugin('install', test_project_dir, test_plugin_dir, plugin_et);
 
-    test.ok(fs.existsSync(srcDir + '/ChildBrowserCommand.m'))
-    test.ok(fs.existsSync(srcDir + '/ChildBrowserViewController.m'))
-    test.ok(fs.existsSync(srcDir + '/preserveDirs/PreserveDirsTest.m'))
-    test.ok(fs.existsSync(srcDir + '/targetDir/TargetDirTest.m'))
+    var pluginPath = path.join(test_dir, 'projects', 'testproj', 'platforms', 'ios', 'HelloCordova', 'Plugins', plugin_id);
+    test.ok(fs.existsSync(path.join(pluginPath, 'ChildBrowserCommand.m')));
+    test.ok(fs.existsSync(path.join(pluginPath, 'ChildBrowserViewController.m')));
+    test.ok(fs.existsSync(path.join(pluginPath, 'preserveDirs/PreserveDirsTest.m')));
     test.done();
 }
 
@@ -63,10 +64,11 @@ exports['should move the header files'] = function (test) {
     // run the platform-specific function
     ios.handlePlugin('install', test_project_dir, test_plugin_dir, plugin_et);
 
-    test.ok(fs.statSync(srcDir + '/ChildBrowserCommand.h'));
-    test.ok(fs.statSync(srcDir + '/ChildBrowserViewController.h'));
-    test.ok(fs.statSync(srcDir + '/preserveDirs/PreserveDirsTest.h'));
-    test.ok(fs.statSync(srcDir + '/targetDir/TargetDirTest.h'));
+    var pluginPath = path.join(test_dir, 'projects', 'testproj', 'platforms', 'ios', 'HelloCordova', 'Plugins', plugin_id);
+    test.ok(fs.existsSync(path.join(pluginPath, 'ChildBrowserCommand.h')));
+    test.ok(fs.existsSync(path.join(pluginPath, 'ChildBrowserViewController.h')));
+    test.ok(fs.existsSync(path.join(pluginPath, 'preserveDirs/PreserveDirsTest.h')));
+
     test.done();
 }
 
@@ -74,7 +76,8 @@ exports['should move the xib file'] = function (test) {
     // run the platform-specific function
     ios.handlePlugin('install', test_project_dir, test_plugin_dir, plugin_et);
 
-    test.ok(fs.statSync(resDir + '/ChildBrowserViewController.xib'));
+    var pluginPath = path.join(test_dir, 'projects', 'testproj', 'platforms', 'ios', 'HelloCordova', 'Plugins', plugin_id);
+    test.ok(fs.existsSync(path.join(pluginPath, 'ChildBrowserViewController.xib')));
     test.done();
 }
 
@@ -82,26 +85,25 @@ exports['should move the bundle'] = function (test) {
     // run the platform-specific function
     ios.handlePlugin('install', test_project_dir, test_plugin_dir, plugin_et);
 
-    var bundle = fs.statSync(resDir + '/ChildBrowser.bundle');
+    var bundlePath = path.join(test_dir, 'projects', 'testproj', 'platforms', 'ios', 'HelloCordova', 'Plugins', plugin_id, 'ChildBrowser.bundle');
+    
+    var bundle = fs.statSync(bundlePath);
 
     test.ok(bundle.isDirectory());
     test.done();
 }
 
-
 exports['should edit PhoneGap.plist'] = function (test) {
     // run the platform-specific function
     ios.handlePlugin('install', test_project_dir, test_plugin_dir, plugin_et);
 
-    var plistPath = test_project_dir + '/SampleApp/PhoneGap.plist';
+    var plistPath = path.join(test_dir, 'projects', 'testproj', 'platforms', 'ios', 'HelloCordova', 'Cordova.plist');
     var obj = plist.parseFileSync(plistPath);
 
-    test.equal(obj.Plugins['com.phonegap.plugins.childbrowser'],
-        'ChildBrowserCommand');
-        
-    test.equal(obj.ExternalHosts.length, 2)    
-    test.equal(obj.ExternalHosts[0], "build.phonegap.com")
-    test.equal(obj.ExternalHosts[1], "s3.amazonaws.com")
+    test.equal(obj.Plugins['ChildBrowser'], 'ChildBrowserCommand');  
+    test.equal(obj.ExternalHosts.length, 2);
+    test.equal(obj.ExternalHosts[0], "build.phonegap.com");
+    test.equal(obj.ExternalHosts[1], "s3.amazonaws.com");
 
     test.done();
 }
@@ -110,12 +112,13 @@ exports['should edit the pbxproj file'] = function (test) {
     // run the platform-specific function
     ios.handlePlugin('install', test_project_dir, test_plugin_dir, plugin_et);
 
-    var projPath = test_project_dir + '/SampleApp.xcodeproj/project.pbxproj';
+    var projPath = path.join(test_dir, 'projects', 'testproj', 'platforms', 'ios', 'HelloCordova.xcodeproj', 'project.pbxproj');
+    
+    var obj = xcode.project(projPath).parseSync();
 
-    obj = xcode.project(projPath).parseSync();
     var fileRefSection = obj.hash.project.objects['PBXFileReference'],
         fileRefLength = Object.keys(fileRefSection).length,
-        EXPECTED_TOTAL_REFERENCES = 92; // magic number ahoy!
+        EXPECTED_TOTAL_REFERENCES = 98; // magic number ahoy!
 
     test.equal(fileRefLength, EXPECTED_TOTAL_REFERENCES);
     test.done();
@@ -124,10 +127,11 @@ exports['should edit the pbxproj file'] = function (test) {
 exports['should add the framework references to the pbxproj file'] = function (test) {
     // run the platform-specific function
     ios.handlePlugin('install', test_project_dir, test_plugin_dir, plugin_et);
-    var projPath = test_project_dir + '/SampleApp.xcodeproj/project.pbxproj',
-        projContents = fs.readFileSync(projPath, 'utf8'),
-        projLines = projContents.split("\n"),
-        references;
+
+    var projPath = path.join(test_dir, 'projects', 'testproj', 'platforms', 'ios', 'HelloCordova.xcodeproj', 'project.pbxproj')
+      , projContents = fs.readFileSync(projPath, 'utf8')
+      , projLines = projContents.split("\n")
+      , references;
 
     references = projLines.filter(function (line) {
         return !!(line.match("libsqlite3.dylib"));

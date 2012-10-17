@@ -6,15 +6,6 @@ var fs = require('fs')
   , path = require('path')
   , et = require('elementtree');
 
-exports.moveProjFile = function(origFile, projPath, callback) {
-    var src = path.resolve(projPath, origFile)
-      , dest = src.replace('.orig', '');
-
-    fs.createReadStream(src)
-        .pipe(fs.createWriteStream(dest))
-        .on('close', callback);
-}
-
 // compare two et.XML nodes, see if they match
 // compares tagName, text, attributes and children (recursively)
 exports.equalNodes = function(one, two) {
@@ -153,4 +144,3 @@ function uniqueChild(node, parent) {
         return true;
     }
 }
-
