@@ -21,6 +21,7 @@ var known_opts = { 'platform' : [ 'ios', 'android', 'www' ]
             , 'list' : Boolean
             , 'v' : Boolean
             , 'debug' : Boolean
+            , 'dev' : Boolean                        
             };
 
 var cli_opts = nopt(known_opts);
@@ -45,6 +46,10 @@ else if (!cli_opts.platform || !cli_opts.project || !cli_opts.plugin) {
 }
 else if (cli_opts.remove) {
     handlePlugin('uninstall', cli_opts.platform, cli_opts.project, cli_opts.plugin);
+}
+else if (cli_opts.dev) {
+    handlePlugin('uninstall', cli_opts.platform, cli_opts.project, cli_opts.plugin);
+    handlePlugin('install', cli_opts.platform, cli_opts.project, cli_opts.plugin);    
 }
 else {
     handlePlugin('install', cli_opts.platform, cli_opts.project, cli_opts.plugin);
