@@ -65,7 +65,7 @@ exports.handlePlugin = function (action, project_dir, plugin_dir, plugin_et) {
     sourceFiles.forEach(function (sourceFile) {
         var srcDir = path.resolve(project_dir,
                                 sourceFile.attrib['target-dir'])
-          , destFile = path.resolve(srcDir,
+            , destFile = path.resolve(srcDir,
                                 path.basename(sourceFile.attrib['src']));
 
         if (action == 'install') {

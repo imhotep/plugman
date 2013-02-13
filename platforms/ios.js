@@ -48,6 +48,7 @@ exports.handlePlugin = function (action, project_dir, plugin_dir, plugin_et) {
     } else if(action == "uninstall" && !pluginInstalled(plugin_et, config_files[0])) {
         throw "Plugin "+plugin_id+" not installed"
     }
+
     var assets = plugin_et.findall('./asset'),
         platformTag = plugin_et.find('./platform[@name="ios"]'),
         sourceFiles = platformTag.findall('./source-file'),
