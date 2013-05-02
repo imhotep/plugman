@@ -56,7 +56,7 @@ exports.handlePlugin = function (action, project_dir, plugin_dir, plugin_et, var
                        );
 
     config_files = config_files.filter(function (val) {
-        return !(/^build\//.test(val));
+        return !(/build\/[^/].*\.app\//.test(val));
     });
 
     if (!config_files.length) {
